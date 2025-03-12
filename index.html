@@ -1,251 +1,38 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Game Balap Karung dengan Lompatan</title>
-    <style>
-        body {
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 100vh;
-            background-color: #87CEEB;
-            margin: 0;
-            font-family: Arial, sans-serif;
-            overflow: hidden;
-        }
-        #game-container {
-            position: relative;
-            width: 80vw;
-            height: 80vh;
-        }
-        .lane {
-            position: absolute;
-            width: 100%;
-            height: 100px;
-            background-image: url("road.png");
-            background-size: cover;
-            background-repeat: no-repeat;
-            background-position: center;
-            bottom: 0;
-        }
-        .obstacle {
-            position: absolute;
-            width: 80px;
-            height: 80px;
-            background-image: url("obstacle.png");
-            background-size: cover;
-            z-index: 1;
-        }
-        #player {
-            position: absolute;
-            width: 60px;
-            height: 120px;
-            background-image: url("player.png");
-            background-size: cover;
-            background-repeat: no-repeat;
-            background-position: center;
-            bottom: 0;
-            transition: 0.2s;
-            z-index: 2;
-        }
-        #score {
-            position: absolute;
-            top: 10px;
-            right: 10px;
-            font-size: 30px;
-            color: white;
-        }
-    </style>
-</head>
-<body>
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, user-scalable=no"
+    />
+    <title>Balap Karung 17 Agustus</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="css/game.css" />
+  </head>
+  <body>
     <div id="game-container">
-        <div class="lane" style="left: 10%;"></div>
-        <div class="lane" style="left: 40%;"></div>
-        <div class="lane" style="left: 70%;"></div>
-        <div id="player"></div>
-        <div id="target"></div>
+      <div class="lane" style="left: 10%"></div>
+      <div class="lane" style="left: 40%"></div>
+      <div class="lane" style="left: 70%"></div>
+      <div id="player"></div>
+      <div id="score">Score: 0</div>
+      <div id="pause-menu">Game Paused</div>
+      <div id="menu">
+        <h1>Balap Karung Game</h1>
+        <p>High Score: <span id="high-score">0</span></p>
+        <button onclick="window.game.startGame()">Start Game</button>
+        <p>
+          Controls:<br />
+          Tap screen or Space to jump<br />
+        </p>
+      </div>
     </div>
-    <div id="score">Score: 0</div>
-    <script>
-        const gameContainer = document.getElementById('game-container');
-        const player = document.getElementById('player');
-        const target = document.getElementById('target');
-        const lanes = Array.from(document.querySelectorAll('.lane'));
-        const laneWidth = 30;
-        let currentLaneIndex = 1; // Start in the middle lane
-        let isJumping = false;
-        let canJump = true; // Control whether the player can jump
-        let obstacles = [];
-        let lastObstacleSpawnTime = 0;
-        let obstacleSpawnInterval = 1500;
-        const maxObstacles = 10; // Set the maximum number of obstacles
-
-        function movePlayerToLane(laneIndex) {
-            const lane = lanes[laneIndex];
-            if (lane) {
-                const laneLeft = lane.offsetLeft;
-                player.style.left = (laneLeft + laneWidth / 2 - player.offsetWidth / 2) + 'px';
-                target.style.left = (laneLeft + laneWidth / 2 - target.offsetWidth / 2) + 'px';
-            }
-        }
-
-        function movePlayerLeft() {
-            if (!isJumping) {
-                currentLaneIndex = Math.max(currentLaneIndex - 1, 0);
-                movePlayerToLane(currentLaneIndex);
-            }
-        }
-
-        function movePlayerRight() {
-            if (!isJumping) {
-                currentLaneIndex = Math.min(currentLaneIndex + 1, lanes.length - 1);
-                movePlayerToLane(currentLaneIndex);
-            }
-        }
-
-        function jump() {
-            if (!isJumping && canJump) {
-                isJumping = true;
-                canJump = false; // Disable jumping until the jump animation completes
-                const originalBottom = player.style.bottom;
-                player.style.transition = '0.3s';
-                player.style.transform = 'translateY(-150px)'; // Move player up
-                setTimeout(() => {
-                    player.style.transition = '0.2s';
-                    player.style.transform = 'translateY(0)'; // Reset player position
-                    isJumping = false;
-                    // Re-enable jumping after a delay
-                    setTimeout(() => {
-                        canJump = true;
-                    }, 500); // 500ms delay before allowing the next jump
-                }, 500);
-            }
-        }
-
-        function checkCollision() {
-            const playerRect = player.getBoundingClientRect();
-            for (const obstacle of obstacles) {
-                const obstacleRect = obstacle.getBoundingClientRect();
-                if (
-                    playerRect.left < obstacleRect.right &&
-                    playerRect.right > obstacleRect.left &&
-                    playerRect.top < obstacleRect.bottom &&
-                    playerRect.bottom > obstacleRect.top
-                ) {
-                    // Pemain menabrak rintangan, game over
-                    alert('Game Over! Your score: ' + score);
-                    if (score > highscore) {
-                        highscore = score;
-                    }
-                    resetGame();
-                }
-            }
-
-            // Additional check to see if the player has reached the bottom
-            const gameContainerRect = gameContainer.getBoundingClientRect();
-            if (playerRect.bottom >= gameContainerRect.bottom) {
-                canJump = true; // Allow jumping when player reaches the bottom
-            }
-        }
-
-        function getRandomObstacleSize() {
-            // Generate a random obstacle size between 20 and 60 pixels
-            return Math.random() * 60 + 60; // Random size between 20 and 60 pixels
-        }
-
-        function getRandomSpawnInterval() {
-            // Generate a random spawn interval between 800 and 1600 milliseconds
-            return Math.random() * 800 + 800; // Random interval between 800 and 1600 milliseconds
-        }
-
-        function createObstacle(laneIndex) {
-            const obstacle = document.createElement('div');
-            obstacle.classList.add('obstacle');
-            const lane = lanes[laneIndex];
-            if (lane) {
-                const laneLeft = lane.offsetLeft;
-                obstacle.style.left = (gameContainer.offsetWidth - obstacle.offsetWidth) + 'px'; // Set obstacle at the right edge
-                obstacle.style.bottom = '0'; // Set obstacle below player
-                const obstacleSize = getRandomObstacleSize();
-                obstacle.style.width = obstacleSize + 'px';
-                obstacle.style.height = obstacleSize + 'px';
-                gameContainer.appendChild(obstacle);
-                obstacles.push(obstacle);
-            }
-        }
-
-        function spawnObstacle() {
-            const currentTime = new Date().getTime();
-            if (currentTime - lastObstacleSpawnTime > obstacleSpawnInterval && obstacles.length < maxObstacles) {
-                const randomLaneIndex = Math.floor(Math.random() * lanes.length);
-                createObstacle(randomLaneIndex);
-                lastObstacleSpawnTime = currentTime;
-                obstacleSpawnInterval = getRandomSpawnInterval(); // Randomize the obstacle spawn interval
-            }
-        }
-
-        function moveObstacles() {
-            for (const obstacle of obstacles) {
-                const obstacleLeft = parseInt(obstacle.style.left);
-                if (obstacleLeft < -obstacle.offsetWidth) {
-                    obstacle.remove();
-                    const obstacleIndex = obstacles.indexOf(obstacle);
-                    if (obstacleIndex > -1) {
-                        obstacles.splice(obstacleIndex, 1);
-                    }
-                } else {
-                    obstacle.style.left = (obstacleLeft - 5) + 'px';
-                }
-            }
-        }
-
-        function resetGame() {
-            for (const obstacle of obstacles) {
-                obstacle.remove();
-            }
-            obstacles.length = 0;
-            currentLaneIndex = Math.floor(lanes.length / 2);
-            movePlayerToLane(currentLaneIndex);
-            score = 0;
-            document.getElementById('score').textContent = 'Score: ' + score;
-        }
-
-        let score = 0;
-        let highscore = 0;
-
-        function updateScore() {
-            score++;
-            document.getElementById('score').textContent = 'Score: ' + score;
-        }
-
-        // Handle arrow key press for movement
-        document.addEventListener('keydown', function(event) {
-            if (event.key === 'ArrowLeft') {
-                movePlayerLeft();
-            } else if (event.key === 'ArrowRight') {
-                movePlayerRight();
-            } else if (event.key === ' ') {
-                jump();
-            }
-        });
-
-        // Game loop
-        function gameLoop() {
-            moveObstacles();
-            spawnObstacle();
-            checkCollision();
-            updateScore();
-            requestAnimationFrame(gameLoop);
-        }
-
-        // Initialize game
-        window.onload = function() {
-            currentLaneIndex = Math.floor(lanes.length / 2);
-            movePlayerToLane(currentLaneIndex);
-            gameLoop();
-        };
-    </script>
-</body>
+    <script src="js/game.js"></script>
+  </body>
 </html>
