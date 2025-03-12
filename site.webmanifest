@@ -1,0 +1,21 @@
+{
+    "name": "Game Balap Karung 17 Agustus",
+    "short_name": "Balap Karung",
+    "description": "Game tradisional Indonesia balap karung dalam bentuk modern",
+    "start_url": "/",
+    "display": "standalone",
+    "background_color": "#1a73e8",
+    "theme_color": "#FF0000",
+    "icons": [
+        {
+            "src": "assets/images/android-chrome-192x192.png",
+            "sizes": "192x192",
+            "type": "image/png"
+        },
+        {
+            "src": "assets/images/android-chrome-512x512.png",
+            "sizes": "512x512",
+            "type": "image/png"
+        }
+    ]
+}
