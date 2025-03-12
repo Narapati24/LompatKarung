@@ -281,4 +281,4 @@ function initGame() {
 }
 
 // Start everything
-window.addEventListener(initGame);
+initGame();
