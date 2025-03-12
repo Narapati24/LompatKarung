@@ -185,10 +185,6 @@ body::before {
     display: none;
 }
 
-@keyframes levelUp {
-    display: none;
-}
-
 #level {
     display: none;
 }
