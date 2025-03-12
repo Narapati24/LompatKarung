@@ -38,6 +38,11 @@ class Game {
         // Bind event handlers
         this.handleTouch = this.handleTouch.bind(this);
         this.handleKeydown = this.handleKeydown.bind(this);
+        
+        // Add start button handler
+        this.startButton = document.getElementById('startButton');
+        this.startButton.addEventListener('click', () => this.startGame());
+        
         this.setupEventListeners();
         this.showMenu();
     }
@@ -338,7 +343,7 @@ class Game {
     }
 }
 
-// Initialize game
+// Initialize game and make it globally available
 window.addEventListener('DOMContentLoaded', () => {
     window.game = new Game();
 });
