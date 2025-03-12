@@ -11,339 +11,274 @@ const GAME_CONFIG = {
     INITIAL_DELAY: 2000
 };
 
-class Game {
-    constructor() {
-        this.gameContainer = document.getElementById('game-container');
-        this.player = document.getElementById('player');
-        this.scoreElement = document.getElementById('score');
-        this.menuElement = document.getElementById('menu');
-        this.lanes = Array.from(document.querySelectorAll('.lane'));
-        
-        // Game state
-        this.score = 0;
-        this.highScore = parseInt(localStorage.getItem('highScore')) || 0;
-        this.speed = GAME_CONFIG.BASE_SPEED;
-        this.isPlaying = false;
-        this.isPaused = false;
-        this.isJumping = false;
-        this.canJump = true;
-        this.currentLaneIndex = 1;
-        this.obstacles = [];
-        this.lastObstacleSpawnTime = 0;
-        this.obstacleSpawnInterval = 1500;
-        this.countdownActive = false;
-        this.gameStartTime = 0;
-        this.jumpTimeout = null;
-        
-        // Bind event handlers
-        this.handleTouch = this.handleTouch.bind(this);
-        this.handleKeydown = this.handleKeydown.bind(this);
-        
-        // Add start button handler
-        this.startButton = document.getElementById('startButton');
-        this.startButton.addEventListener('click', () => this.startGame());
-        
-        this.setupEventListeners();
-        this.showMenu();
-    }
+// Game state
+const gameState = {
+    score: 0,
+    highScore: parseInt(localStorage.getItem('highScore')) || 0,
+    speed: GAME_CONFIG.BASE_SPEED,
+    isPlaying: false,
+    isPaused: false,
+    isJumping: false,
+    canJump: true,
+    currentLaneIndex: 1,
+    obstacles: [],
+    lastObstacleSpawnTime: 0,
+    obstacleSpawnInterval: 1500,
+    countdownActive: false,
+    gameStartTime: 0,
+    jumpTimeout: null
+};
 
-    setupEventListeners() {
-        // Handle touch events
-        document.addEventListener('touchstart', this.handleTouch, { passive: false });
-        document.addEventListener('keydown', this.handleKeydown);
-    }
+// DOM Elements
+const elements = {
+    gameContainer: document.getElementById('game-container'),
+    player: document.getElementById('player'),
+    scoreElement: document.getElementById('score'),
+    menuElement: document.getElementById('menu'),
+    startButton: document.getElementById('startButton'),
+    lanes: Array.from(document.querySelectorAll('.lane'))
+};
 
-    handleTouch(e) {
-        e.preventDefault(); // Prevent default touch behavior
-        if (this.isPlaying && !this.isPaused) {
-            this.jump();
-        } else if (!this.isPlaying && e.target.tagName !== 'BUTTON') {
-            // Start game on touch if not playing (except when touching buttons)
-            this.startGame();
-        }
-    }
-
-    handleKeydown(e) {
-        if (!this.isPlaying) return;
-        if (e.code === 'Space') {
-            e.preventDefault(); // Prevent page scroll on space
-            this.jump();
-        }
-    }
-
-    // Clean up event listeners when game is destroyed
-    destroy() {
-        document.removeEventListener('touchstart', this.handleTouch);
-        document.removeEventListener('keydown', this.handleKeydown);
-    }
-
-    movePlayerToLane(laneIndex) {
-        const lane = this.lanes[laneIndex];
-        if (lane) {
-            const laneLeft = lane.offsetLeft;
-            this.player.style.left = (laneLeft + GAME_CONFIG.LANE_WIDTH / 2 - this.player.offsetWidth / 2) + 'px';
-        }
-    }
-
-    movePlayer(direction) {
-        if (this.isJumping || this.isPaused) return;
-        
-        if (direction === 'left') {
-            this.currentLaneIndex = Math.max(this.currentLaneIndex - 1, 0);
-        } else {
-            this.currentLaneIndex = Math.min(this.currentLaneIndex + 1, this.lanes.length - 1);
-        }
-        this.movePlayerToLane(this.currentLaneIndex);
-    }
-
-    resetGame() {
-        // Reset semua state game
-        this.obstacles.forEach(obstacle => obstacle.element.remove());
-        this.obstacles = [];
-        this.score = 0;
-        this.speed = GAME_CONFIG.BASE_SPEED;
-        this.currentLaneIndex = Math.floor(this.lanes.length / 2);
-        this.movePlayerToLane(this.currentLaneIndex);
-        this.lastObstacleSpawnTime = 0;
-        this.obstacleSpawnInterval = GAME_CONFIG.SPAWN_INTERVAL;
-        
-        // Update UI
-        this.scoreElement.textContent = `Score: ${this.score}`;
-    }
-
-    startCountdown() {
-        this.countdownActive = true;
-        let count = GAME_CONFIG.COUNTDOWN_DURATION;
-        
-        const countdownElement = document.createElement('div');
-        countdownElement.className = 'countdown';
-        this.gameContainer.appendChild(countdownElement);
-        
-        const countdownInterval = setInterval(() => {
-            if (count > 0) {
-                countdownElement.textContent = count;
-                count--;
-            } else {
-                clearInterval(countdownInterval);
-                countdownElement.remove();
-                this.countdownActive = false;
-                this.gameStartTime = Date.now();
-                this.isPlaying = true; // Pastikan game sudah playing
-                this.gameLoop();
-            }
-        }, 1000);
-    }
-
-    startGame() {
-        // Bersihkan state game sebelumnya
-        this.isPlaying = false;
-        this.isPaused = false;
-        this.obstacles.forEach(obstacle => obstacle.element.remove());
-        this.obstacles = [];
-        
-        this.menuElement.style.display = 'none';
-        this.resetGame();
-        this.startCountdown();
-    }
-
-    togglePause() {
-        this.isPaused = !this.isPaused;
-        document.getElementById('pause-menu').style.display = 
-            this.isPaused ? 'flex' : 'none';
-    }
-
-    checkCollision(playerRect, obstacleRect) {
-        const tolerance = 10; // Collision tolerance for better gameplay
-        return !(
-            playerRect.right - tolerance < obstacleRect.left + tolerance ||
-            playerRect.left + tolerance > obstacleRect.right - tolerance ||
-            playerRect.bottom - tolerance < obstacleRect.top + tolerance ||
-            playerRect.top + tolerance > obstacleRect.bottom - tolerance
-        );
-    }
-
-    showMenu(finalScore = 0) {
-        this.menuElement.style.display = 'block';
-        const highScoreElement = document.getElementById('high-score');
-        highScoreElement.textContent = this.highScore;
-        
-        // Hapus pesan game over yang lama jika ada
-        const oldMessage = this.menuElement.querySelector('.game-over-message');
-        if (oldMessage) {
-            oldMessage.remove();
-        }
-        
-        if (finalScore > 0) {
-            const scoreMessage = document.createElement('p');
-            scoreMessage.className = 'game-over-message';
-            scoreMessage.textContent = `Game Over! Score: ${finalScore}`;
-            this.menuElement.insertBefore(scoreMessage, this.menuElement.firstChild);
-        }
-
-        // Reset state game
-        this.isPlaying = false;
-        this.isPaused = false;
-    }
-
-    gameLoop = () => {
-        if (!this.isPlaying || this.isPaused) return;
-
-        const currentTime = Date.now();
-        // Pastikan game sudah melewati initial delay
-        if (currentTime - this.gameStartTime >= GAME_CONFIG.INITIAL_DELAY) {
-            this.moveObstacles();
-            this.spawnObstacle();
-            this.checkCollisions();
-        }
-        
-        // Selalu lanjutkan game loop
-        requestAnimationFrame(this.gameLoop);
-    }
-
-    updateScore() {
-        this.score += 10;
-        this.scoreElement.textContent = `Score: ${this.score}`;
-    }
-
-    jump() {
-        if (!this.canJump || this.isJumping || !this.isPlaying || this.isPaused) return;
-
-        this.isJumping = true;
-        this.canJump = false;
-        
-        // Clear any existing timeout to prevent animation conflicts
-        if (this.jumpTimeout) {
-            clearTimeout(this.jumpTimeout);
-        }
-
-        // Start jump animation immediately
-        this.player.classList.add('jumping');
-        
-        this.jumpTimeout = setTimeout(() => {
-            this.player.classList.remove('jumping');
-            this.isJumping = false;
-            this.canJump = true; // Allow next jump immediately after landing
-        }, 600); // Increase duration to 600ms for slower animation
-    }
-
-    getRandomObstacleSize() {
-        // Generate random size between MIN and MAX, but keep aspect ratio
-        const height = Math.random() * 
-            (GAME_CONFIG.MAX_OBSTACLE_SIZE - GAME_CONFIG.MIN_OBSTACLE_SIZE) + 
-            GAME_CONFIG.MIN_OBSTACLE_SIZE;
-        
-        // Width akan sedikit lebih kecil dari height untuk memudahkan lompatan
-        const width = (height * 0.8);
-        
-        return { width, height };
-    }
-
-    createObstacle(laneIndex) {
-        const obstacle = document.createElement('div');
-        obstacle.classList.add('obstacle');
-        const lane = this.lanes[laneIndex];
-        if (lane) {
-            const laneLeft = lane.offsetLeft;
-            const startPosition = window.innerWidth + 100; // Gunakan window.innerWidth untuk konsistensi
-            const size = this.getRandomObstacleSize();
-            
-            // Set random size
-            obstacle.style.width = `${size.width}px`;
-            obstacle.style.height = `${size.height}px`;
-            obstacle.style.left = `${laneLeft}px`;
-            obstacle.style.transform = `translateX(${startPosition}px)`;
-            obstacle.style.bottom = '0';
-            
-            this.gameContainer.appendChild(obstacle);
-            this.obstacles.push({
-                element: obstacle,
-                lane: laneIndex,
-                position: startPosition,
-                passed: false, // Track apakah obstacle sudah dilewati
-                size: size
-            });
-        }
-    }
-
-    moveObstacles() {
-        const toRemove = [];
-        const containerRect = this.gameContainer.getBoundingClientRect();
-        const playerRect = this.player.getBoundingClientRect();
-        
-        this.obstacles.forEach((obstacle, index) => {
-            obstacle.position -= this.speed;
-            const lane = this.lanes[obstacle.lane];
-            const laneLeft = lane.offsetLeft;
-            
-            // Update posisi obstacle
-            obstacle.element.style.left = `${laneLeft}px`;
-            obstacle.element.style.transform = `translateX(${obstacle.position}px)`;
-            
-            // Cek posisi obstacle relatif terhadap pemain
-            const obstacleRect = obstacle.element.getBoundingClientRect();
-            
-            // Update score saat obstacle melewati pemain
-            if (!obstacle.passed && obstacleRect.right < playerRect.left) {
-                this.updateScore();
-                obstacle.passed = true;
-            }
-            
-            // Hapus hanya jika benar-benar sudah keluar layar
-            if (obstacleRect.right < containerRect.left - 100) {
-                toRemove.push(index);
-                obstacle.element.remove();
-            }
-        });
-        
-        // Hapus obstacles yang sudah keluar layar
-        for (let i = toRemove.length - 1; i >= 0; i--) {
-            this.obstacles.splice(toRemove[i], 1);
-        }
-    }
-
-    spawnObstacle() {
-        const currentTime = Date.now();
-        const lastObstacle = this.obstacles[this.obstacles.length - 1];
-        
-        const minDistanceOK = !lastObstacle || 
-            (lastObstacle.position < window.innerWidth - GAME_CONFIG.MIN_OBSTACLE_DISTANCE);
-        
-        if (currentTime - this.lastObstacleSpawnTime > GAME_CONFIG.SPAWN_INTERVAL && 
-            minDistanceOK && 
-            this.obstacles.length < GAME_CONFIG.MAX_OBSTACLES) {
-            
-            const randomLaneIndex = Math.floor(Math.random() * this.lanes.length);
-            this.createObstacle(randomLaneIndex);
-            this.lastObstacleSpawnTime = currentTime;
-        }
-    }
-
-    checkCollisions() {
-        const playerRect = this.player.getBoundingClientRect();
-        
-        for (const obstacle of this.obstacles) {
-            const obstacleRect = obstacle.element.getBoundingClientRect();
-            if (this.checkCollision(playerRect, obstacleRect)) {
-                this.gameOver();
-                return;
-            }
-        }
-    }
-
-    gameOver() {
-        this.isPlaying = false;
-        const finalScore = this.score;
-        if (finalScore > this.highScore) {
-            this.highScore = finalScore;
-            localStorage.setItem('highScore', this.highScore);
-        }
-        
-        // Langsung tampilkan menu dengan score
-        this.showMenu(finalScore);
+// Event Handlers
+function handleTouch(e) {
+    e.preventDefault();
+    if (gameState.isPlaying && !gameState.isPaused) {
+        jump();
+    } else if (!gameState.isPlaying && e.target.tagName !== 'BUTTON') {
+        startGame();
     }
 }
 
-// Initialize game and make it globally available
-window.addEventListener('DOMContentLoaded', () => {
-    window.game = new Game();
-});
+function handleKeydown(e) {
+    if (!gameState.isPlaying) return;
+    if (e.code === 'Space') {
+        e.preventDefault();
+        jump();
+    }
+}
+
+// Game Functions
+function movePlayerToLane(laneIndex) {
+    const lane = elements.lanes[laneIndex];
+    if (lane) {
+        const laneLeft = lane.offsetLeft;
+        elements.player.style.left = `${laneLeft + GAME_CONFIG.LANE_WIDTH / 2 - elements.player.offsetWidth / 2}px`;
+    }
+}
+
+function jump() {
+    if (!gameState.canJump || gameState.isJumping || !gameState.isPlaying || gameState.isPaused) return;
+
+    gameState.isJumping = true;
+    gameState.canJump = false;
+
+    if (gameState.jumpTimeout) {
+        clearTimeout(gameState.jumpTimeout);
+    }
+
+    elements.player.classList.add('jumping');
+    gameState.jumpTimeout = setTimeout(() => {
+        elements.player.classList.remove('jumping');
+        gameState.isJumping = false;
+        gameState.canJump = true;
+    }, 600);
+}
+
+function resetGame() {
+    gameState.obstacles.forEach(obstacle => obstacle.element.remove());
+    gameState.obstacles = [];
+    gameState.score = 0;
+    gameState.speed = GAME_CONFIG.BASE_SPEED;
+    gameState.currentLaneIndex = Math.floor(elements.lanes.length / 2);
+    movePlayerToLane(gameState.currentLaneIndex);
+    updateScore();
+}
+
+function startCountdown() {
+    gameState.countdownActive = true;
+    let count = GAME_CONFIG.COUNTDOWN_DURATION;
+    
+    const countdownElement = document.createElement('div');
+    countdownElement.className = 'countdown';
+    elements.gameContainer.appendChild(countdownElement);
+    
+    const countdownInterval = setInterval(() => {
+        if (count > 0) {
+            countdownElement.textContent = count;
+            count--;
+        } else {
+            clearInterval(countdownInterval);
+            countdownElement.remove();
+            gameState.countdownActive = false;
+            gameState.gameStartTime = Date.now();
+            gameState.isPlaying = true;
+            gameLoop();
+        }
+    }, 1000);
+}
+
+function startGame() {
+    gameState.isPlaying = false;
+    gameState.isPaused = false;
+    elements.menuElement.style.display = 'none';
+    resetGame();
+    startCountdown();
+}
+
+function gameLoop() {
+    if (!gameState.isPlaying || gameState.isPaused) return;
+
+    const currentTime = Date.now();
+    if (currentTime - gameState.gameStartTime >= GAME_CONFIG.INITIAL_DELAY) {
+        moveObstacles();
+        spawnObstacle();
+        checkCollisions();
+    }
+
+    requestAnimationFrame(gameLoop);
+}
+
+function updateScore() {
+    gameState.score += 10;
+    elements.scoreElement.textContent = `Score: ${gameState.score}`;
+}
+
+// Tambahkan fungsi-fungsi obstacle
+function getRandomObstacleSize() {
+    const height = Math.random() * 
+        (GAME_CONFIG.MAX_OBSTACLE_SIZE - GAME_CONFIG.MIN_OBSTACLE_SIZE) + 
+        GAME_CONFIG.MIN_OBSTACLE_SIZE;
+    return {
+        width: height * 0.8,
+        height: height
+    };
+}
+
+function createObstacle(laneIndex) {
+    const obstacle = document.createElement('div');
+    obstacle.classList.add('obstacle');
+    const lane = elements.lanes[laneIndex];
+    if (lane) {
+        const laneLeft = lane.offsetLeft;
+        const startPosition = window.innerWidth;
+        const size = getRandomObstacleSize();
+
+        obstacle.style.width = `${size.width}px`;
+        obstacle.style.height = `${size.height}px`;
+        obstacle.style.left = `${laneLeft}px`;
+        obstacle.style.transform = `translateX(${startPosition}px)`;
+        
+        elements.gameContainer.appendChild(obstacle);
+        gameState.obstacles.push({
+            element: obstacle,
+            lane: laneIndex,
+            position: startPosition,
+            passed: false,
+            size: size
+        });
+    }
+}
+
+function moveObstacles() {
+    const toRemove = [];
+    const containerRect = elements.gameContainer.getBoundingClientRect();
+    const playerRect = elements.player.getBoundingClientRect();
+    
+    gameState.obstacles.forEach((obstacle, index) => {
+        obstacle.position -= gameState.speed;
+        const obstacleRect = obstacle.element.getBoundingClientRect();
+        
+        // Update position
+        obstacle.element.style.transform = `translateX(${obstacle.position}px)`;
+        
+        // Check if passed player
+        if (!obstacle.passed && obstacleRect.right < playerRect.left) {
+            obstacle.passed = true;
+            updateScore();
+        }
+        
+        // Check if out of screen
+        if (obstacleRect.right < containerRect.left - 100) {
+            toRemove.push(index);
+            obstacle.element.remove();
+        }
+    });
+    
+    // Remove out-of-screen obstacles
+    for (let i = toRemove.length - 1; i >= 0; i--) {
+        gameState.obstacles.splice(toRemove[i], 1);
+    }
+}
+
+function spawnObstacle() {
+    const currentTime = Date.now();
+    const lastObstacle = gameState.obstacles[gameState.obstacles.length - 1];
+    
+    const minDistanceOK = !lastObstacle || 
+        (lastObstacle.position < window.innerWidth - GAME_CONFIG.MIN_OBSTACLE_DISTANCE);
+    
+    if (currentTime - gameState.lastObstacleSpawnTime > GAME_CONFIG.SPAWN_INTERVAL && 
+        minDistanceOK && 
+        gameState.obstacles.length < GAME_CONFIG.MAX_OBSTACLES) {
+        
+        const randomLaneIndex = Math.floor(Math.random() * elements.lanes.length);
+        createObstacle(randomLaneIndex);
+        gameState.lastObstacleSpawnTime = currentTime;
+    }
+}
+
+function checkCollisions() {
+    const playerRect = elements.player.getBoundingClientRect();
+    
+    for (const obstacle of gameState.obstacles) {
+        const obstacleRect = obstacle.element.getBoundingClientRect();
+        if (checkCollision(playerRect, obstacleRect)) {
+            gameOver();
+            return;
+        }
+    }
+}
+
+function checkCollision(rect1, rect2) {
+    const tolerance = 10;
+    return !(
+        rect1.right - tolerance < rect2.left + tolerance ||
+        rect1.left + tolerance > rect2.right - tolerance ||
+        rect1.bottom - tolerance < rect2.top + tolerance ||
+        rect1.top + tolerance > rect2.bottom - tolerance
+    );
+}
+
+function gameOver() {
+    gameState.isPlaying = false;
+    if (gameState.score > gameState.highScore) {
+        gameState.highScore = gameState.score;
+        localStorage.setItem('highScore', gameState.highScore);
+    }
+    showMenu(gameState.score);
+}
+
+function showMenu(finalScore = 0) {
+    elements.menuElement.style.display = 'block';
+    document.getElementById('high-score').textContent = gameState.highScore;
+    
+    const oldMessage = elements.menuElement.querySelector('.game-over-message');
+    if (oldMessage) oldMessage.remove();
+    
+    if (finalScore > 0) {
+        const scoreMessage = document.createElement('p');
+        scoreMessage.className = 'game-over-message';
+        scoreMessage.textContent = `Game Over! Score: ${finalScore}`;
+        elements.menuElement.insertBefore(scoreMessage, elements.menuElement.firstChild);
+    }
+}
+
+// Initialize game
+function initGame() {
+    elements.startButton.addEventListener('click', startGame);
+    document.addEventListener('touchstart', handleTouch, { passive: false });
+    document.addEventListener('keydown', handleKeydown);
+}
+
+// Start everything
+window.addEventListener('DOMContentLoaded', initGame);
