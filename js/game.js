@@ -281,4 +281,4 @@ function initGame() {
 }
 
 // Start everything
-window.addEventListener('DOMContentLoaded', initGame);
+window.addEventListener(initGame);
